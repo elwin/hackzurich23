@@ -35,12 +35,12 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 #USER appuser
 
 # Copy the source code into the container.
-COPY requirements.txt .
 COPY sensors.parquet .
 COPY congestion.parquet .
 COPY stations.csv .
 COPY main.py .
 COPY server.py .
+COPY requirements.txt .
 
 
 # Expose the port that the application listens on.
