@@ -113,7 +113,7 @@ def save(ax, name="plot.pdf"):
 
 def generate_training():
     df = duckdb.sql(f"""
-      select MSR_id, CarSpeed, MedianCarSpeed, round(CarSpeed / MedianCarSpeed, 2) < 0.7 as congestion, time from (
+      select MSR_id, round(CarSpeed / MedianCarSpeed, 2) < 0.7 as congestion, time from (
                   select merged.MSR_id as MSR_id, CarSpeed, MedianCarSpeed, CarFlow, time_bucket(INTERVAL '30 minutes', strptime(TimeStamp, '%Y-%M-%dT%H:%M:%S.000000Z')) as time
                   from merged.parquet as merged join {sensor_file} as sensors on merged.MSR_id = sensors.MSR_id
               )
