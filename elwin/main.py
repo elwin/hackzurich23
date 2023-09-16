@@ -12,6 +12,7 @@ import duckdb
 
 sensor_file = "stations.csv"
 congestion_file = "congestion.parquet"
+training_file = "training.parquet"
 
 
 def sql(s):
@@ -39,8 +40,8 @@ def initialize():
 
 def store_congested():
     congested = duckdb.sql(f"""
-    select MSR_id, CarSpeed, MedianCarSpeed, round(CarSpeed / MedianCarSpeed, 2) as fraction, time from (
-                select merged.MSR_id as MSR_id, CarSpeed, MedianCarSpeed, CarFlow, time_bucket(INTERVAL '30 minutes', strptime(TimeStamp, '%Y-%M-%dT%H:%M:%S.000000Z')) as time
+    select MSR_id, CarSpeed, MedianCarSpeed, round(CarSpeed / MedianCarSpeed, 2) as fraction, dayofweek(time) as weekday, hour(time) * 60 + minute(time) as minutes from (
+                select merged.MSR_id as MSR_id, CarSpeed, MedianCarSpeed, CarFlow, strptime(TimeStamp, '%Y-%M-%dT%H:%M:%S.000000Z') as time
                 from merged.parquet as merged join {sensor_file} as sensors on merged.MSR_id = sensors.MSR_id
             )
     where fraction < 0.7
@@ -120,20 +121,20 @@ def generate_training():
         where congestion is not null
       """)
 
-    df.to_parquet("training.parquet", compression="gzip")
-    df.to_csv("training.csv.gzip", compression="gzip", header=True)
+    df.to_parquet(training_file, compression="gzip")
 
 
 if __name__ == '__main__':
-
-    generate_training()
-    exit(0)
 
     if not pathlib.Path(sensor_file).is_file():
         initialize()
 
     if not pathlib.Path(congestion_file).is_file():
         store_congested()
+
+    if not pathlib.Path(training_file).is_file():
+        generate_training()
+
 
     # store_parquet()
 

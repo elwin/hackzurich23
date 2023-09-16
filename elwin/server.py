@@ -9,13 +9,15 @@ import duckdb
 import googlemaps
 import numpy as np
 from flask import Flask, request
+from flask_cors import CORS
 
 from main import sensor_file, congestion_file, sql
 
 api_key = os.getenv("GOOGLE_API_KEY")
-production = os.getenv("PRODUCTION") != ""
+production = os.getenv("PRODUCTION") is not None
 
 app = Flask(__name__)
+CORS(app)
 gmaps = googlemaps.Client(key=api_key)
 
 
@@ -30,6 +32,8 @@ def estimate_endpoint():
     departure_time = get_arg('departure_time')
 
     departure_time = datetime.datetime.strptime(departure_time, "%Y-%m-%d %H:%M:%S")
+
+    departure_time = datetime.datetime.now() + datetime.timedelta(days=1)
 
     return estimate(start, stop, departure_time)
 
@@ -76,18 +80,18 @@ def extract_routes(data):
     return out
 
 
-def get_traffic_score(route, start_time=None, end_time=None):
+def get_traffic_score(route, start_time=None):
     path = ", ".join([f"ST_POINT({lat}, {lon})" for (lat, lon) in route.path])
 
-    if start_time is None and end_time is None:
+    if start_time is None:
         time_query = ""
     else:
-        start_time = start_time.strftime('%Y-%M-%dT%H:%M:%S')
-        end_time = end_time.strftime('%Y-%M-%dT%H:%M:%S')
+        weekday = start_time.weekday()
+        minutes = start_time.hour * 60 + start_time.minute
 
         time_query = f"""
-        and congestion.time > strptime('{start_time}', '%Y-%M-%dT%H:%M:%S')
-        and congestion.time < strptime('{end_time}', '%Y-%M-%dT%H:%M:%S')
+        and congestion.weekday = {weekday}
+        and congestion.minutes = {minutes}
         """
 
     congestions = duckdb.sql(f"""
@@ -103,14 +107,32 @@ def get_traffic_score(route, start_time=None, end_time=None):
             group by point
         """)
 
-    x = congestions.count("point").df()
+    sql(f"""
+    select ST_Point(Latitude, Longitude) as point, min(congestion.fraction)
+            from {sensor_file} as sensor, {congestion_file} as congestion
+            where ST_Distance(ST_MakeLine([{path}]), point) < 0.001
+            and sensor.MSR_id = congestion.MSR_id
+            and congestion.fraction < 0.7
+            {time_query}
+            group by point
+    """)
 
-    return int(x['count(point)'][0])
+    sql(f"""
+    select * from {congestion_file} where minutes = 1438 and weekday = 6
+        """)
+
+    try:
+        x = congestions.count("point").df()
+        x = int(x['count(point)'][0])
+    except AttributeError:
+        x = 0
+
+    return x
 
 
-def sensor_points(route, start_time, end_time):
+def sensor_points(route, start_time):
     max_score = get_traffic_score(route)
-    cur_score = get_traffic_score(route, start_time, end_time)
+    cur_score = get_traffic_score(route, start_time)
 
     return cur_score / max_score
 
@@ -136,7 +158,6 @@ def estimate(start="Zürich, Affoltern", stop="Visp", departure_time=datetime.da
         traffic_score = sensor_points(
             route,
             start_time=departure_time,
-            end_time=departure_time + datetime.timedelta(seconds=route.time),
         )
         route.traffic_score = traffic_score
 
