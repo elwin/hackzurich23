@@ -47,9 +47,9 @@ class Route:
     def dict(self):
         traffic_delay = abs(self.traffic_time - self.time) * self.traffic_score * 10
         return {
-            "traffic_points": self.traffic_score,
+            "traffic_score": self.traffic_score,
             "overview_polyline": self.overview_polyline,
-            "estimated_traffic_delay": traffic_delay,
+            "estimated_traffic_delay": int(traffic_delay),
             "total_time": traffic_delay + self.time,
         }
 
@@ -152,4 +152,4 @@ def main():
 
 if __name__ == '__main__':
     # main()
-    app.run(port=5001)
+    app.run(port=8000)

@@ -1,0 +1,8 @@
+duckdb==0.8.1
+Flask==2.3.3
+googlemaps==4.10.0
+matplotlib==3.8.0
+numpy==1.25.2
+pandas==2.0.3
+pyarrow==13.0.0
+tqdm==4.66.1
