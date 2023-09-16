@@ -1,10 +1,8 @@
 import dataclasses
 import datetime
-import itertools
 import json
 import os
-import time
-import flask
+
 import duckdb
 import googlemaps
 import numpy as np
@@ -33,7 +31,7 @@ def estimate_endpoint():
 
     departure_time = datetime.datetime.strptime(departure_time, "%Y-%m-%d %H:%M:%S")
 
-    departure_time = datetime.datetime.now() + datetime.timedelta(days=1)
+    # departure_time = datetime.datetime.now() + datetime.timedelta(days=1)
 
     return estimate(start, stop, departure_time)
 
@@ -54,6 +52,7 @@ class Route:
         return {
             "traffic_score": self.traffic_score,
             "overview_polyline": self.overview_polyline,
+            "overview_path": [{"lat": lat, "lng": lng} for (lat, lng) in self.path],
             "estimated_traffic_delay": int(traffic_delay),
             "total_time": traffic_delay + self.time,
         }
