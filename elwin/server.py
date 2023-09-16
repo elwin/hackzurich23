@@ -13,6 +13,7 @@ from flask import Flask, request
 from main import sensor_file, congestion_file, sql
 
 api_key = os.getenv("GOOGLE_API_KEY")
+production = os.getenv("PRODUCTION") != ""
 
 app = Flask(__name__)
 gmaps = googlemaps.Client(key=api_key)
@@ -114,7 +115,7 @@ def sensor_points(route, start_time, end_time):
     return cur_score / max_score
 
 
-def estimate(start="Zürich, Affoltern", stop="Visp", departure_time=datetime.datetime.now(), mock=True):
+def estimate(start="Zürich, Affoltern", stop="Visp", departure_time=datetime.datetime.now(), mock=False):
     if mock:
         res = json.load(open("gmaps.json"))
 
@@ -152,4 +153,7 @@ def main():
 
 if __name__ == '__main__':
     # main()
-    app.run(port=8000)
+    if production:
+        duckdb.sql("SET home_directory='/'")
+
+    app.run(port=8000, host="0.0.0.0")
