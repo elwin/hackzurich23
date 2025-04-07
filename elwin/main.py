@@ -1,3 +1,4 @@
+import datetime
 import glob
 import os
 import pathlib
@@ -40,8 +41,8 @@ def initialize():
 
 def store_congested():
     congested = duckdb.sql(f"""
-    select MSR_id, CarSpeed, MedianCarSpeed, round(CarSpeed / MedianCarSpeed, 2) as fraction, dayofweek(time) as weekday, hour(time) * 60 + minute(time) as minutes from (
-                select merged.MSR_id as MSR_id, CarSpeed, MedianCarSpeed, CarFlow, strptime(TimeStamp, '%Y-%M-%dT%H:%M:%S.000000Z') as time
+    select MSR_id, CarSpeed, CarFlow, MedianCarSpeed, round(CarSpeed / MedianCarSpeed, 2) as fraction, dayofweek(time) as weekday, hour(time) * 60 + minute(time) as minutes from (
+                select merged.MSR_id as MSR_id, CarSpeed, MedianCarSpeed, CarFlow, strptime(TimeStamp, '%Y-%m-%dT%H:%M:%S.000000Z') as time
                 from merged.parquet as merged join {sensor_file} as sensors on merged.MSR_id = sensors.MSR_id
             )
     where fraction < 0.7
@@ -124,7 +125,49 @@ def generate_training():
     df.to_parquet(training_file, compression="gzip")
 
 
+def evaluation1():
+    start_time = datetime.datetime.strptime("2023-09-04 07:55:00", "%Y-%m-%d %H:%M:%S")
+    sensor_id = "CH:0056.05"
+    minutes = start_time.hour * 60 + start_time.minute
+    threshold = 20
+
+    sql(f"""
+    select * from congestion.parquet
+    where 1 = 1
+    and MSR_id = 'CH:0056.05'
+    and congestion.weekday not in (5, 6)
+    and congestion.minutes < {minutes + threshold}
+    and congestion.minutes > {minutes - threshold}
+    and MSR_id = '{sensor_id}'
+    order by congestion.minutes
+    """)
+
+def evaluation2():
+    start_time = datetime.datetime.strptime("2023-09-07 21:55:00", "%Y-%m-%d %H:%M:%S")
+    sensor_id = "CH:0342.01"
+    weekday = start_time.weekday()
+    minutes = start_time.hour * 60 + start_time.minute
+
+    time_query = f"""
+          and congestion.weekday = {weekday}
+          and congestion.minutes = {minutes}
+          """
+
+    threshold = 60
+
+    sql(f"""
+    select * from congestion.parquet
+    where 1 = 1
+    and MSR_id = 'CH:0056.05'
+    and congestion.minutes > {minutes - threshold}
+    and congestion.minutes < {minutes + threshold}
+    order by congestion.minutes
+    """)
+
+
 if __name__ == '__main__':
+    evaluation1()
+    evaluation2()
 
     if not pathlib.Path(sensor_file).is_file():
         initialize()
@@ -134,7 +177,6 @@ if __name__ == '__main__':
 
     if not pathlib.Path(training_file).is_file():
         generate_training()
-
 
     # store_parquet()
 
